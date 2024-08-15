@@ -1,5 +1,4 @@
 # Correção de erros
-from conversao import *
 
 def add_bit_de_paridade_par (bit_string: list) -> list:
     """Conta o número de bits na sequência e adiciona um bit a mais no fim,
@@ -13,6 +12,9 @@ def add_bit_de_paridade_par (bit_string: list) -> list:
     new_bit_string = bit_string + [last_bit]
 
     return new_bit_string
+
+def checar_bit_de_paridade_par (bit_string: list) -> list:
+    return
 
 def calc_crc (bit_string: list, crc_len: int, generator: list) -> list:
     """Calcula bits para correção de erro usando CRC. """
