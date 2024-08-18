@@ -1,7 +1,7 @@
 # Para testes
 from enquadramento import *
 from correcao import *
-from conversao import *
+# from conversao import *
 
 # test = [1,1,1,1,1,1,1,0,1]
 # print(bit2byte_string(test))
@@ -39,15 +39,17 @@ from conversao import *
 # print(b[1])
 
 
-a = [1,2,255,3,4,126,5,6]
-x = [2,2,2]
-t = [126, 1, 2]
-a_ = enquadrar_com_flag(a)
-b = desenquadrar_com_flag(a_ + x)
-c = desenquadrar_com_flag(t)
-print(a)
-print(a_)
-print(b[0])
-print(b[1])
-print(c[0])
-print(c[1])
+# a = [1,2,255,3,4,126,5,6]
+# x = [2,2,2]
+# t = [126, 1, 2]
+# a_ = enquadrar_com_flag(a)
+# b = desenquadrar_com_flag(a_ + x)
+# c = desenquadrar_com_flag(t)
+# print(a)
+# print(a_)
+# print(b[0])
+# print(b[1])
+# print(c[0])
+# print(c[1])
+
+print("Olá mundo")

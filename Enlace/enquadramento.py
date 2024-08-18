@@ -7,15 +7,21 @@ def enquadrar_com_contagem (byte_string: list) -> list:
     frame = [character_count] + byte_string
     return frame
 
-def desenquadrar_com_contagem (byte_string: list) -> list:
+def desenquadrar_com_contagem (byte_string: list):
     """ Desenquadra um sequência de bytes, usando método de contagem de caracteres.
         Retorna uma tupla contendo quadro e resto da sequência de bytes. """
     character_count = byte_string[0]
     frame = []
     for i in range(character_count):
-        frame += [byte_string[1 + i]]
-    remaining_string = list(byte_string[1+character_count:])
-    return (frame, remaining_string)
+        if 1 + i < len(byte_string):
+            frame += [byte_string[1 + i]]
+        else:
+            break
+    remaining_string = []
+    if 1+character_count < len(byte_string):
+        remaining_string = list(byte_string[1+character_count:])
+
+    return (frame, character_count, remaining_string)
 
 def enquadrar_com_flag (byte_string: list) -> list:
     """
@@ -35,7 +41,7 @@ def enquadrar_com_flag (byte_string: list) -> list:
     frame.append(flag)
     return frame
 
-def desenquadrar_com_flag (byte_string: list) -> list:
+def desenquadrar_com_flag (byte_string: list):
     """
         Desenquadra uma sequência de bytes encapsuladas por um flag.
         Retorna uma tupla contendo quadro e resto da sequência de bytes.
