@@ -5,15 +5,16 @@ import threading
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Pango
 
-# from ..conversao import *
+from conversao import *
 from Enlace.enquadramento import *
+from Enlace.correcao import *
 
 # Variáveis
 crc_len = 32
 generator = [1,0,0,0,0,0,1,0,0,1,1,0,0,0,0,0,1,0,0,0,1,1,1,0,1,1,0,1,1,0,1,1,1] # Representação do polinômio gerador, neste caso CRC32 IEEE 802-3
 
 
-class TextViewWindow(Gtk.ApplicationWindow):
+class GUIServer(Gtk.ApplicationWindow):
     def __init__(self, **kargs):
         super().__init__(**kargs, title='Servidor')
 
@@ -24,7 +25,13 @@ class TextViewWindow(Gtk.ApplicationWindow):
 
         self.create_textview()
         # self.create_toolbar()
-        # self.create_buttons()
+        self.create_buttons()
+
+
+        # Configuração de parâmetros de comunicação
+        self.encoding_type = 0 # Código usado: 0 - Sem código; 1 - NRZ Polar; 2 - Manchester; 3 - Bipolar
+        self.framing_type = 0 # Enquadramento: 0 - Contagem de caracteres; 1 - Delimitação por flag
+        self.error_handling_type = 0 # Método de detecção/correção: 0 - Sem método; 1 - Bit de paridade par; 2 - CRC32; 3 - Hamming
 
     def create_toolbar(self):
         toolbar = Gtk.Box(spacing=6)
@@ -127,109 +134,259 @@ class TextViewWindow(Gtk.ApplicationWindow):
         grid = Gtk.Grid()
         self.box.append(grid)
 
-        check_editable = Gtk.CheckButton(label='Editable')
-        check_editable.props.active = True
-        check_editable.connect('toggled', self.on_editable_toggled)
-        grid.attach(check_editable, 0, 0, 1, 1)
+        radio_nocode = Gtk.CheckButton(label='Sem Código')
+        radio_nocode.props.active = True
+        grid.attach(radio_nocode, 0, 0, 1, 1)
 
-        check_cursor = Gtk.CheckButton(label='Cursor Visible')
-        check_cursor.props.active = True
-        check_editable.connect('toggled', self.on_cursor_toggled)
+        radio_nrzp = Gtk.CheckButton(label='NRZ Polar')
+        radio_nrzp.set_group(radio_nocode)
         grid.attach_next_to(
-            check_cursor, check_editable, Gtk.PositionType.RIGHT, 1, 1
+            radio_nrzp, radio_nocode, Gtk.PositionType.RIGHT, 1, 1
         )
 
-        radio_wrapnone = Gtk.CheckButton(label='No Wrapping')
-        radio_wrapnone.props.active = True
-        grid.attach(radio_wrapnone, 0, 1, 1, 1)
-
-        radio_wrapchar = Gtk.CheckButton(label='Character Wrapping')
-        radio_wrapchar.set_group(radio_wrapnone)
+        radio_manchester = Gtk.CheckButton(label='Manchester')
+        radio_manchester.set_group(radio_nocode)
         grid.attach_next_to(
-            radio_wrapchar, radio_wrapnone, Gtk.PositionType.RIGHT, 1, 1
+            radio_manchester, radio_nrzp, Gtk.PositionType.RIGHT, 1, 1
         )
 
-        radio_wrapword = Gtk.CheckButton(label='Word Wrapping')
-        radio_wrapword.set_group(radio_wrapnone)
+        radio_bipolar = Gtk.CheckButton(label='Bipolar')
+        radio_bipolar.set_group(radio_nocode)
         grid.attach_next_to(
-            radio_wrapword, radio_wrapchar, Gtk.PositionType.RIGHT, 1, 1
+            radio_bipolar, radio_manchester, Gtk.PositionType.RIGHT, 1, 1
         )
 
-        radio_wrapnone.connect(
-            'toggled', self.on_wrap_toggled, Gtk.WrapMode.NONE
+        radio_nocode.connect(
+            'toggled', self.on_code_toggled, 0
         )
-        radio_wrapchar.connect(
-            'toggled', self.on_wrap_toggled, Gtk.WrapMode.CHAR
+        radio_nrzp.connect(
+            'toggled', self.on_code_toggled, 1
         )
-        radio_wrapword.connect(
-            'toggled', self.on_wrap_toggled, Gtk.WrapMode.WORD
+        radio_manchester.connect(
+            'toggled', self.on_code_toggled, 2
+        )
+        radio_bipolar.connect(
+            'toggled', self.on_code_toggled, 3
         )
 
-    def on_button_clicked(self, _widget, tag):
-        bounds = self.textbuffer.get_selection_bounds()
-        if len(bounds) != 0:
-            start, end = bounds
-            self.textbuffer.apply_tag(tag, start, end)
 
-    def on_clear_clicked(self, _widget):
-        start = self.textbuffer.get_start_iter()
-        end = self.textbuffer.get_end_iter()
-        self.textbuffer.remove_all_tags(start, end)
+        radio_ccount = Gtk.CheckButton(label='Contagem de caracteres')
+        radio_ccount.props.active = True
+        grid.attach(radio_ccount, 0, 1, 1, 1)
 
-    def on_editable_toggled(self, widget):
-        self.textview.props.editable = widget.props.active
+        radio_flag = Gtk.CheckButton(label='Flag delimitadora')
+        radio_flag.set_group(radio_ccount)
+        grid.attach_next_to(
+            radio_flag, radio_ccount, Gtk.PositionType.RIGHT, 1, 1
+        )
 
-    def on_cursor_toggled(self, widget):
-        self.textview.props.cursor_visible = widget.props.active
+        radio_ccount.connect(
+            'toggled', self.on_frame_toggled, 0
+        )
 
-    def on_wrap_toggled(self, _widget, mode):
-        self.textview.props.wrap_mode = mode
-
-    def on_justify_toggled(self, _widget, justification):
-        self.textview.props.justification = justification
+        radio_flag.connect(
+            'toggled', self.on_frame_toggled, 1
+        )
 
 
-def separate_frame (byte_string: list):
-    frame, characer_count, remaining_string = desenquadrar_com_contagem(byte_string)
-    return (frame, characer_count, remaining_string)
+        radio_noerror = Gtk.CheckButton(label='Sem detecção/correção')
+        radio_noerror.props.active = True
+        grid.attach(radio_noerror, 0, 2, 1, 1)
 
-def get_msg_from_frame (data: list, character_count: int):
-    bin_msg = bytearray(data)
-    msg = "Character count: " + str(character_count) + "\n" + bin_msg.decode('utf8') + "\n"
-    return msg
+        radio_parity = Gtk.CheckButton(label='Bit de paridade par')
+        radio_parity.set_group(radio_noerror)
+        grid.attach_next_to(
+            radio_parity, radio_noerror, Gtk.PositionType.RIGHT, 1, 1
+        )
 
-def get_all_msgs (data: bytearray) -> list:
-    byte_string = [byte for byte in data] # Converte para uma lista de bytes no formato usado aqui
-    msgs = ""
-    while len(byte_string) > 0:
-        frame, character_count, byte_string = separate_frame(byte_string)
-        msgs += get_msg_from_frame(frame, character_count)
-    return msgs
+        radio_CRC32 = Gtk.CheckButton(label='CRC-32')
+        radio_CRC32.set_group(radio_noerror)
+        grid.attach_next_to(
+            radio_CRC32, radio_parity, Gtk.PositionType.RIGHT, 1, 1
+        )
 
-def server_routine(window: TextViewWindow):
+        radio_hamming = Gtk.CheckButton(label='Hamming')
+        radio_hamming.set_group(radio_noerror)
+        grid.attach_next_to(
+            radio_hamming, radio_CRC32, Gtk.PositionType.RIGHT, 1, 1
+        )
 
-    msgs = ""
-    host = "127.0.0.1"
-    port = 6969
+        radio_noerror.connect(
+            'toggled', self.on_errortype_toggled, 0
+        )
 
-    tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    tcp_server.bind((host, port))
-    tcp_server.listen()
-    conn, addr = tcp_server.accept()
-    while 1:
-        data = conn.recv(1024)
-        if not data:
-            break
-        msgs = get_all_msgs(data)
-        window.textbuffer.set_text(msgs)
-        conn.sendall(data)
-    conn.close()
+        radio_parity.connect(
+            'toggled', self.on_errortype_toggled, 1
+        )
+
+        radio_CRC32.connect(
+            'toggled', self.on_errortype_toggled, 2
+        )
+
+        radio_hamming.connect(
+            'toggled', self.on_errortype_toggled, 3
+        )
+    
+
+    def on_code_toggled(self, _widget, mode):
+        self.encoding_type = mode
+
+    def on_frame_toggled(self, _widget, mode):
+        self.framing_type = mode
+
+    def on_errortype_toggled(self, _widget, mode):
+        self.error_handling_type = mode
+
+
+    def server_routine(self):
+
+        msgs = ""
+        host = "127.0.0.1"
+        port = 6969
+
+        tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        tcp_server.bind((host, port))
+        tcp_server.listen()
+        while 1:
+            conn, addr = tcp_server.accept()
+            data = conn.recv(1024)
+            if data:
+                msgs = self.get_all_msgs(data)
+                self.textbuffer.set_text(msgs)
+                conn.sendall(data)
+            conn.close()
+
+    def decode_data (self, data: bytearray) -> list:
+
+        byte_stream = [byte for byte in data]
+        
+        match self.encoding_type:
+
+            case 0: # Sem código
+                pass
+
+            case 1: # NRZ Polar
+                # todo
+                pass
+            
+            case 2: # Manchester
+                # todo
+                pass
+
+            case 3: # Bipolar
+                # todo
+                pass
+
+            case _:
+                pass
+
+        return byte_stream
+
+    def separate_frame (self, byte_string: list):
+        frame = []
+        remaining_string = []
+
+        match self.framing_type:
+
+            case 0: # Contagem de caracteres
+                frame, _, remaining_string = desenquadrar_com_contagem(byte_string)
+            
+            case 1: # Inserção de byte de flag
+                frame, remaining_string = desenquadrar_com_flag(byte_string)
+            
+            case _:
+                pass
+
+        return (frame, remaining_string)
+    
+    def check_error (self, byte_string: list) -> bool:
+
+        error_present = False
+
+        # Detecção/Correção de error
+        match self.error_handling_type:
+
+            case 0:
+                pass # Nada a ser feito
+
+            case 1: # Bit de paridade par
+                bit_list = byte2bit_string(byte_string)
+                error_present = not checar_bit_de_paridade_par(bit_list)
+            
+            case 2: # CRC 32
+                bit_list = byte2bit_string(byte_string)
+                error_present = not check_crc(bit_list, crc_len, generator)
+
+            case 3: # Hamming
+                # To-do
+                pass
+
+            case _:
+                pass
+
+        return error_present
+    
+    def strip_error_code (self, byte_string: list) -> list:
+
+        byte_frame = list(byte_string)
+        match self.error_handling_type:
+
+            case 0:
+                pass # Nada a ser feito
+
+            case 1: # Bit de paridade par
+                byte_frame = byte_frame[:-1]
+            
+            case 2: # CRC 32
+                byte_frame = byte_frame[:-4]
+
+            case 3: # Hamming
+                # To-do
+                pass
+
+            case _:
+                pass
+
+        return byte_frame
+
+
+    def get_msg_from_frame (self, byte_frame: list):
+        
+        error_present = self.check_error(byte_frame)
+        frame = self.strip_error_code(byte_frame)
+        bin_msg = bytearray(frame)
+        msg = ""
+
+        if error_present:
+            msg += "Erro detectado na mensagem."
+            match self.error_handling_type:
+                case 1:
+                    msg += " Número de bits não é par."
+                case 2:
+                    msg += " Resto de CRC não é zero."
+                case _:
+                    pass
+        else:
+            msg += "Nenhum erro detectado."
+
+        msg += "\n"
+        # msg = "Character count: " + str(character_count) + "\n" + bin_msg.decode('utf8') + "\n"
+        msg += bin_msg.decode('utf8') + "\n"
+        return msg
+
+    def get_all_msgs (self, data: bytearray) -> list:
+        byte_string = self.decode_data(data) # Converte para uma lista de bytes no formato usado aqui
+        msgs = ""
+        while len(byte_string) > 0:
+            frame, byte_string = self.separate_frame(byte_string)
+            msgs += self.get_msg_from_frame(frame)
+        return msgs
 
 def on_activate(app):
-    win = TextViewWindow(application=app)
+    win = GUIServer(application=app)
     win.present()
     
-    server_thread = threading.Thread(target=server_routine, args=[win])
+    server_thread = threading.Thread(target=win.server_routine, args=[])
     server_thread.daemon = True
     server_thread.start()
 

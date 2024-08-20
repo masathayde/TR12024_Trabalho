@@ -13,8 +13,13 @@ def add_bit_de_paridade_par (bit_string: list) -> list:
 
     return new_bit_string
 
-def checar_bit_de_paridade_par (bit_string: list) -> list:
-    return
+def checar_bit_de_paridade_par (bit_string: list) -> bool:
+    """Retorna True se o número de bits na sequência de entrada for par """
+    # Somamos todos os bits, se o resultado for par, retorna verdadeiro
+    result = 0
+    for bit in bit_string:
+         result += bit
+    return not bool(result % 2)
 
 def calc_crc (bit_string: list, crc_len: int, generator: list) -> list:
     """Calcula bits para correção de erro usando CRC. """
@@ -52,3 +57,10 @@ def check_crc (bit_string: list, crc_len: int, generator: list) -> bool:
             break
     
     return is_correct
+
+def add_crc (bit_string: list, crc_len: int, generator: list) -> list:
+     """Faz cálculo de CRC e adiciona os bits no final da mensagem"""
+     bit_string_with_crc = list(bit_string)
+     crc = calc_crc(bit_string, crc_len, generator)
+     bit_string_with_crc += crc
+     return bit_string_with_crc
