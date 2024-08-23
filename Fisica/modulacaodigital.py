@@ -3,7 +3,7 @@ def mod_NRZpolar(bit_stream):
     for i in range(len(bit_stream)):
         bit = bit_stream[i]
         if bit == 0:
-            bit = 255
+            bit = -1
         bit_out.append(bit)
     return bit_out
 

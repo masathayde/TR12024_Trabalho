@@ -243,7 +243,7 @@ class GUIServer(Gtk.ApplicationWindow):
 
         msgs = ""
         host = "127.0.0.1"
-        port = 6969
+        port = 7778
 
         tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tcp_server.bind((host, port))
@@ -261,7 +261,6 @@ class GUIServer(Gtk.ApplicationWindow):
 
         bit_stream = [bit for bit in data]
         bit_stream = reverseMakeByteArrayFriendly(bit_stream)
-        print(bit_stream)
         
         match self.encoding_type:
 
@@ -296,7 +295,6 @@ class GUIServer(Gtk.ApplicationWindow):
             
             case 1: # Inserção de byte de flag
                 frame, remaining_string = desenquadrar_com_flag(bit_string)
-                print(frame)
             
             case _:
                 pass
@@ -372,19 +370,25 @@ class GUIServer(Gtk.ApplicationWindow):
                 case 2:
                     msg += " Resto de CRC não é zero."
                 case 3:
-                    msg += " Aplicada correção de erro."
+                    msg += " Aplicada correção de erro. Ainda podem existir erros."
+                    msg += "\n"
+                    try:
+                        msg += bin_msg.decode('utf8')
+                    except UnicodeDecodeError:
+                        msg += "Não foi possível decodificar mensagem. A mensagem não pode ser exibida."
                 case _:
                     pass
+            msg += "\n"
         else:
             msg += "Nenhum erro detectado."
-
-        msg += "\n"
-        # msg = "Character count: " + str(character_count) + "\n" + bin_msg.decode('utf8') + "\n"
-        msg += bin_msg.decode('utf8') + "\n"
+            msg += "\n"
+            msg += bin_msg.decode('utf8') + "\n"
+        
         return msg
 
     def get_all_msgs (self, data: bytearray) -> list:
-        bit_string = self.decode_data(data) # Converte para uma lista de bytes no formato usado aqui
+        bit_string = self.decode_data(data) # Converte para uma lista no formato usado aqui
+        print(bit_string)
         msgs = ""
         while len(bit_string) > 0:
             frame, bit_string = self.separate_frame(bit_string)

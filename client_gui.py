@@ -71,7 +71,7 @@ class GUIClient(Gtk.ApplicationWindow):
             return
 
         host = "127.0.0.1"
-        port = 6969
+        port = 7777
 
         tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tcp_client.connect((host, port))
@@ -94,15 +94,19 @@ class GUIClient(Gtk.ApplicationWindow):
         signal_representation = self.modulate_stream(encoded_bit_stream)
         self.display_modulated_signal(signal_representation)
 
-        print(encoded_bit_stream)
-
         # Convertendo -1 para 255
         encoded_bit_stream = makeByteArrayFriendly(encoded_bit_stream)
         encoded_byte_stream = bytearray(encoded_bit_stream)
+        
+        # Para que o programa Meio saiba qual codificação e enquadramento usados
+        code = bytearray([self.encoding_type])
+        framing_type = bytearray([self.framing_type])
+        encoded_byte_stream = code + framing_type + encoded_byte_stream
+
         status = tcp_client.send(encoded_byte_stream)
 
         if status > 0:
-            data = tcp_client.recv(1024)
+            data = tcp_client.recv(2048)
             print('Got', repr(data))
         tcp_client.close()
 
@@ -283,8 +287,7 @@ class GUIClient(Gtk.ApplicationWindow):
         bin_msg = bytearray(msg, 'utf8')
         msg_byte_list = [byte for byte in bin_msg]
         bit_list = byte2bit_string(msg_byte_list)
-        print(bit_list)
-        
+
         # Detecção/Correção de error
         match self.error_handling_type:
 
