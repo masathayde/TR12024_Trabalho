@@ -7,6 +7,8 @@ from gi.repository import Gtk, Pango
 from conversao import *
 from Enlace.enquadramento import *
 from Enlace.correcao import *
+from Fisica.modulacaodigital import *
+from Fisica.mod_portadora import *
 
 # Variáveis
 crc_len = 32
@@ -83,18 +85,20 @@ class GUIClient(Gtk.ApplicationWindow):
         self.textbuffer.insert(self.textbuffer.get_end_iter(), "----\n") # Coloca um separador para indicar que as mensages na seção anterior foram enviadas
 
 
-        byte_string = []
+        bit_string = []
         for msg in msg_list:
-            byte_string += self.create_frame(msg)
-        byte_stream = bytearray(byte_string)
-        
-        encoded_bit_stream = self.encode_stream(byte_stream)
+            bit_string += self.create_frame(msg)
+
+        encoded_bit_stream = self.encode_stream(bit_string)
+
         signal_representation = self.modulate_stream(encoded_bit_stream)
         self.display_modulated_signal(signal_representation)
 
+        print(encoded_bit_stream)
 
-        encoded_byte_stream = list(bit2byte_string(encoded_bit_stream))
-        encoded_byte_stream = bytearray(encoded_byte_stream)
+        # Convertendo -1 para 255
+        encoded_bit_stream = makeByteArrayFriendly(encoded_bit_stream)
+        encoded_byte_stream = bytearray(encoded_bit_stream)
         status = tcp_client.send(encoded_byte_stream)
 
         if status > 0:
@@ -278,6 +282,8 @@ class GUIClient(Gtk.ApplicationWindow):
     def create_frame (self, msg:str) -> list:
         bin_msg = bytearray(msg, 'utf8')
         msg_byte_list = [byte for byte in bin_msg]
+        bit_list = byte2bit_string(msg_byte_list)
+        print(bit_list)
         
         # Detecção/Correção de error
         match self.error_handling_type:
@@ -286,20 +292,13 @@ class GUIClient(Gtk.ApplicationWindow):
                 pass # Nada a ser feito
 
             case 1: # Bit de paridade par
-                bit_list = byte2bit_string(msg_byte_list)
-                parity_bit_list = add_bit_de_paridade_par(bit_list)
-                msg_byte_list = list(bit2byte_string(parity_bit_list))
-            
+                bit_list = add_bit_de_paridade_par(bit_list)
+
             case 2: # CRC 32
-                # Caso o tamanho CRC não seja um número potência de 2..
-                # A conversão byte -> bit -> byte vai alterar a entrada original..
-                # E o CRC correto será perdido. Ou seja, vai dar ruim.
-                bit_list = byte2bit_string(msg_byte_list)
-                crc_bit_list = add_crc(bit_list, crc_len, generator)
-                msg_byte_list = list(bit2byte_string(crc_bit_list))
+                bit_list = add_crc(bit_list, crc_len, generator)
 
             case 3: # Hamming
-                # To-do
+                bit_list = cod_hamming(bit_list)
                 pass
 
             case _:
@@ -310,20 +309,20 @@ class GUIClient(Gtk.ApplicationWindow):
         match self.framing_type:
 
             case 0: # Contagem de caracteres
-                msg_byte_list = list(enquadrar_com_contagem(msg_byte_list))
+                bit_list = list(enquadrar_com_contagem(bit_list))
             
             case 1: # Inserção de byte de flag
-                msg_byte_list = list(enquadrar_com_flag(msg_byte_list))
+                bit_list = list(enquadrar_com_flag(bit_list))
             
             case _:
                 pass
         
-        frame = msg_byte_list
+        frame = bit_list
         return frame
 
-    def encode_stream (self, byte_string: list) -> list:
+    def encode_stream (self, bit_string: list) -> list:
 
-        encoded_bit_stream = list(byte2bit_string(byte_string))
+        encoded_bit_stream = list(bit_string)
 
         match self.encoding_type:
 
@@ -331,15 +330,15 @@ class GUIClient(Gtk.ApplicationWindow):
                 pass
 
             case 1: # NRZ Polar
-                # todo
+                encoded_bit_stream = mod_NRZpolar(encoded_bit_stream)
                 pass
             
             case 2: # Manchester
-                # todo
+                encoded_bit_stream, _ = mod_Manchester(encoded_bit_stream, 1)
                 pass
 
             case 3: # Bipolar
-                # todo
+                encoded_bit_stream = mod_Bipolar(encoded_bit_stream)
                 pass
 
             case _:

@@ -1,7 +1,7 @@
 # Funções de auxílio
 
 def bit2byte_string (bit_string: list) -> list:
-    """Caso haja não haja menos de 8 bits em um grupo, o algoritmo abaixo "preenche" o valor com zeros à esquerda. """
+    """Caso haja menos de 8 bits em um grupo, o algoritmo abaixo "preenche" o valor com zeros à esquerda. """
     bytecount = len(bit_string)//8 # Presume que a lista não seja vazia
     if len(bit_string) % 8 != 0:
         bytecount += 1
@@ -37,6 +37,14 @@ def posInt2Bit (number: int) -> list:
 
     return bit_string
 
+def bitList2PosInt (bit_list: list) -> int:
+    result = 0
+    i = 0
+    while i < len(bit_list):
+        result += bit_list[i] * (2**(len(bit_list)-1-i))
+        i += 1
+    return result
+
 def byte2bit_string (byte_string: list) -> list:
     """Converte sequência de números inteiros positivos para sequência de bits """
     result = []
@@ -50,3 +58,11 @@ def byte2bit_string (byte_string: list) -> list:
         result += partial_result
     
     return result
+
+
+def int2ByteArray (num_list: list) -> bytearray:
+    """Converte uma lista de inteiros contendo para bytearray"""
+    output = bytearray()
+    for num in num_list:
+        output.append(num)
+    return output

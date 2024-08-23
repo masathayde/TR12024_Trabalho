@@ -8,6 +8,7 @@ from gi.repository import Gtk, Pango
 from conversao import *
 from Enlace.enquadramento import *
 from Enlace.correcao import *
+from Fisica.modulacaodigital import *
 
 # Variáveis
 crc_len = 32
@@ -249,7 +250,7 @@ class GUIServer(Gtk.ApplicationWindow):
         tcp_server.listen()
         while 1:
             conn, addr = tcp_server.accept()
-            data = conn.recv(1024)
+            data = conn.recv(2048)
             if data:
                 msgs = self.get_all_msgs(data)
                 self.textbuffer.set_text(msgs)
@@ -258,7 +259,9 @@ class GUIServer(Gtk.ApplicationWindow):
 
     def decode_data (self, data: bytearray) -> list:
 
-        byte_stream = [byte for byte in data]
+        bit_stream = [bit for bit in data]
+        bit_stream = reverseMakeByteArrayFriendly(bit_stream)
+        print(bit_stream)
         
         match self.encoding_type:
 
@@ -266,41 +269,43 @@ class GUIServer(Gtk.ApplicationWindow):
                 pass
 
             case 1: # NRZ Polar
-                # todo
+                bit_stream = demod_NRZpolar(bit_stream)
                 pass
             
             case 2: # Manchester
-                # todo
+                bit_stream = demod_Manchester(bit_stream)
                 pass
 
             case 3: # Bipolar
-                # todo
+                bit_stream = demod_Bipolar(bit_stream)
                 pass
 
             case _:
                 pass
 
-        return byte_stream
+        return bit_stream
 
-    def separate_frame (self, byte_string: list):
+    def separate_frame (self, bit_string: list):
         frame = []
         remaining_string = []
 
         match self.framing_type:
 
             case 0: # Contagem de caracteres
-                frame, _, remaining_string = desenquadrar_com_contagem(byte_string)
+                frame, _, remaining_string = desenquadrar_com_contagem(bit_string)
             
             case 1: # Inserção de byte de flag
-                frame, remaining_string = desenquadrar_com_flag(byte_string)
+                frame, remaining_string = desenquadrar_com_flag(bit_string)
+                print(frame)
             
             case _:
                 pass
 
         return (frame, remaining_string)
     
-    def check_error (self, byte_string: list) -> bool:
+    def check_error (self, bit_list: list):
 
+        corrected_bit_list = list(bit_list)
         error_present = False
 
         # Detecção/Correção de error
@@ -310,51 +315,53 @@ class GUIServer(Gtk.ApplicationWindow):
                 pass # Nada a ser feito
 
             case 1: # Bit de paridade par
-                bit_list = byte2bit_string(byte_string)
                 error_present = not checar_bit_de_paridade_par(bit_list)
             
             case 2: # CRC 32
-                bit_list = byte2bit_string(byte_string)
                 error_present = not check_crc(bit_list, crc_len, generator)
 
             case 3: # Hamming
-                # To-do
+                # Altera a entrada.
+                corrected_bit_list, error_present = decod_hamming (bit_list)
                 pass
 
             case _:
                 pass
 
-        return error_present
+        return corrected_bit_list, error_present
     
-    def strip_error_code (self, byte_string: list) -> list:
+    def strip_error_code (self, bit_string: list) -> list:
 
-        byte_frame = list(byte_string)
+        frame = list(bit_string)
         match self.error_handling_type:
 
             case 0:
                 pass # Nada a ser feito
 
             case 1: # Bit de paridade par
-                byte_frame = byte_frame[:-1]
+                frame = frame[:-1]
             
             case 2: # CRC 32
-                byte_frame = byte_frame[:-4]
+                frame = frame[:-32]
 
             case 3: # Hamming
-                # To-do
+                # Nada a ser feito se for Hamming
                 pass
 
             case _:
                 pass
 
-        return byte_frame
+        return frame
 
 
-    def get_msg_from_frame (self, byte_frame: list):
+    def get_msg_from_frame (self, frame: list):
         
-        error_present = self.check_error(byte_frame)
-        frame = self.strip_error_code(byte_frame)
-        bin_msg = bytearray(frame)
+        corrected_frame, error_present = self.check_error(frame)
+        payload = self.strip_error_code(corrected_frame)
+
+        byte_payload = bit2byte_string(payload)
+
+        bin_msg = bytearray(byte_payload)
         msg = ""
 
         if error_present:
@@ -364,6 +371,8 @@ class GUIServer(Gtk.ApplicationWindow):
                     msg += " Número de bits não é par."
                 case 2:
                     msg += " Resto de CRC não é zero."
+                case 3:
+                    msg += " Aplicada correção de erro."
                 case _:
                     pass
         else:
@@ -375,10 +384,12 @@ class GUIServer(Gtk.ApplicationWindow):
         return msg
 
     def get_all_msgs (self, data: bytearray) -> list:
-        byte_string = self.decode_data(data) # Converte para uma lista de bytes no formato usado aqui
+        bit_string = self.decode_data(data) # Converte para uma lista de bytes no formato usado aqui
         msgs = ""
-        while len(byte_string) > 0:
-            frame, byte_string = self.separate_frame(byte_string)
+        while len(bit_string) > 0:
+            frame, bit_string = self.separate_frame(bit_string)
+            if frame == []: # Não conseguimos criar uma frame por erro na sequência de bits
+                break
             msgs += self.get_msg_from_frame(frame)
         return msgs
 
