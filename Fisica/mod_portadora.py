@@ -319,25 +319,25 @@ def eight_qam_bipolar_normal(amplitude = 1.0, frequency = 1.0, bits = [1, -1], s
         if bit_triple == (0, 0, 0):
             for i in range(sample_num):
                 signal.append(amplitude * math.sin(2 * math.pi * frequency * i / sample_num))
-        elif bit_triple == (0, 0, 1):
+        elif bit_triple == (0, 0, 1) or bit_triple == (0, 0, -1):
             for i in range(sample_num):
                 signal.append(amplitude * math.sin((2 * math.pi * frequency * i / sample_num) + (math.pi / 4)))
-        elif bit_triple == (0, -1, 1):
+        elif bit_triple == (0, -1, 1) or bit_triple == (0, 1, -1):
             for i in range(sample_num):
                 signal.append(amplitude * math.sin((2 * math.pi * frequency * i / sample_num) + (math.pi / 2)))
-        elif bit_triple == (0, -1, 0):
+        elif bit_triple == (0, -1, 0) or bit_triple == (0, 1, 0):
             for i in range(sample_num):
                 signal.append(amplitude * math.sin((2 * math.pi * frequency * i / sample_num) + (3 * math.pi / 4)))
-        elif bit_triple == (1, -1, 0):
+        elif bit_triple == (1, -1, 0) or bit_triple == (-1, 1, 0):
             for i in range(sample_num):
                 signal.append(amplitude * math.sin((2 * math.pi * frequency * i / sample_num) + math.pi))
-        elif bit_triple == (1, -1, 1):
+        elif bit_triple == (1, -1, 1) or bit_triple == (-1, 1, -1):
             for i in range(sample_num):
                 signal.append(amplitude * math.sin((2 * math.pi * frequency * i / sample_num) + (5 * math.pi / 4)))
-        elif bit_triple == (1, 0, 1):
+        elif bit_triple == (1, 0, -1) or bit_triple == (-1, 0, 1):
             for i in range(sample_num):
                 signal.append(amplitude * math.sin((2 * math.pi * frequency * i / sample_num) + (3 * math.pi / 2)))
-        else: # bit_triple == (1, 0, 0)
+        else: # bit_triple == (1, 0, 0) or bit_triple == (-1, 0, 0)
             for i in range(sample_num):
                 signal.append(amplitude * math.sin((2 * math.pi * frequency * i / sample_num) + (7 * math.pi / 4)))
 
