@@ -8,7 +8,7 @@ from Fisica.modulacaodigital import *
 
 class Meio ():
 
-    def __init__(self, err_prob = 0.1, max_err = 3, err_only_in_frame = True):
+    def __init__(self, err_prob = 0.1, max_err = 1, err_only_in_frame = True):
         self.error_probability = float(err_prob)
         self.max_errors = int(max_err)
         self.error_only_inside_frame = bool(err_only_in_frame)

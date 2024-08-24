@@ -25,7 +25,6 @@ class GUIServer(Gtk.ApplicationWindow):
         self.set_child(self.box)
 
         self.create_textview()
-        # self.create_toolbar()
         self.create_buttons()
 
 
@@ -33,76 +32,6 @@ class GUIServer(Gtk.ApplicationWindow):
         self.encoding_type = 0 # Código usado: 0 - Sem código; 1 - NRZ Polar; 2 - Manchester; 3 - Bipolar
         self.framing_type = 0 # Enquadramento: 0 - Contagem de caracteres; 1 - Delimitação por flag
         self.error_handling_type = 0 # Método de detecção/correção: 0 - Sem método; 1 - Bit de paridade par; 2 - CRC32; 3 - Hamming
-
-    def create_toolbar(self):
-        toolbar = Gtk.Box(spacing=6)
-        toolbar.props.margin_top = 6
-        toolbar.props.margin_start = 6
-        toolbar.props.margin_end = 6
-        self.box.prepend(toolbar)
-
-        button_bold = Gtk.Button(icon_name='format-text-bold-symbolic')
-        toolbar.append(button_bold)
-
-        button_italic = Gtk.Button(icon_name='format-text-italic-symbolic')
-        toolbar.append(button_italic)
-
-        button_underline = Gtk.Button(
-            icon_name='format-text-underline-symbolic'
-        )
-        toolbar.append(button_underline)
-
-        button_bold.connect('clicked', self.on_button_clicked, self.tag_bold)
-        button_italic.connect(
-            'clicked', self.on_button_clicked, self.tag_italic
-        )
-        button_underline.connect(
-            'clicked', self.on_button_clicked, self.tag_underline
-        )
-
-        toolbar.append(Gtk.Separator())
-
-        justifyleft = Gtk.ToggleButton(
-            icon_name='format-justify-left-symbolic'
-        )
-        toolbar.append(justifyleft)
-
-        justifycenter = Gtk.ToggleButton(
-            icon_name='format-justify-center-symbolic'
-        )
-        justifycenter.set_group(justifyleft)
-        toolbar.append(justifycenter)
-
-        justifyright = Gtk.ToggleButton(
-            icon_name='format-justify-right-symbolic'
-        )
-        justifyright.set_group(justifyleft)
-        toolbar.append(justifyright)
-
-        justifyfill = Gtk.ToggleButton(
-            icon_name='format-justify-fill-symbolic'
-        )
-        justifyfill.set_group(justifyleft)
-        toolbar.append(justifyfill)
-
-        justifyleft.connect(
-            'toggled', self.on_justify_toggled, Gtk.Justification.LEFT
-        )
-        justifycenter.connect(
-            'toggled', self.on_justify_toggled, Gtk.Justification.CENTER
-        )
-        justifyright.connect(
-            'toggled', self.on_justify_toggled, Gtk.Justification.RIGHT
-        )
-        justifyfill.connect(
-            'toggled', self.on_justify_toggled, Gtk.Justification.FILL
-        )
-
-        toolbar.append(Gtk.Separator())
-
-        button_clear = Gtk.Button(icon_name='edit-clear-symbolic')
-        button_clear.connect('clicked', self.on_clear_clicked)
-        toolbar.append(button_clear)
 
     def create_textview(self):
         scrolledwindow = Gtk.ScrolledWindow()
@@ -117,19 +46,6 @@ class GUIServer(Gtk.ApplicationWindow):
         self.textview.props.cursor_visible = False
 
         scrolledwindow.set_child(self.textview)
-
-        self.tag_bold = self.textbuffer.create_tag(
-            'bold', weight=Pango.Weight.BOLD
-        )
-        self.tag_italic = self.textbuffer.create_tag(
-            'italic', style=Pango.Style.ITALIC
-        )
-        self.tag_underline = self.textbuffer.create_tag(
-            'underline', underline=Pango.Underline.SINGLE
-        )
-        self.tag_found = self.textbuffer.create_tag(
-            'found', background='yellow'
-        )
 
     def create_buttons(self):
         grid = Gtk.Grid()
@@ -366,18 +282,17 @@ class GUIServer(Gtk.ApplicationWindow):
             msg += "Erro detectado na mensagem."
             match self.error_handling_type:
                 case 1:
-                    msg += " Número de bits não é par."
+                    msg += " Soma de bits não é par.\n"
                 case 2:
-                    msg += " Resto de CRC não é zero."
+                    msg += " Resto de CRC não é zero.\n"
                 case 3:
-                    msg += " Aplicada correção de erro. Ainda podem existir erros."
-                    msg += "\n"
-                    try:
-                        msg += bin_msg.decode('utf8')
-                    except UnicodeDecodeError:
-                        msg += "Não foi possível decodificar mensagem. A mensagem não pode ser exibida."
+                    msg += " Aplicada correção de erro. Ainda podem existir erros.\n"
                 case _:
                     pass
+            try:
+                msg += bin_msg.decode('utf8')
+            except UnicodeDecodeError:
+                msg += "Não foi possível decodificar mensagem. A mensagem não pode ser exibida."
             msg += "\n"
         else:
             msg += "Nenhum erro detectado."

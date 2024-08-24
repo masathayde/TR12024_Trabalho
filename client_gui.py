@@ -4,6 +4,12 @@ import socket
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Pango
 
+import numpy as np
+
+from matplotlib.backends.backend_gtk4agg import \
+    FigureCanvasGTK4Agg as FigureCanvas
+from matplotlib.figure import Figure
+
 from conversao import *
 from Enlace.enquadramento import *
 from Enlace.correcao import *
@@ -13,6 +19,97 @@ from Fisica.mod_portadora import *
 # Variáveis
 crc_len = 32
 generator = [1,0,0,0,0,0,1,0,0,1,1,0,0,0,0,0,1,0,0,0,1,1,1,0,1,1,0,1,1,0,1,1,1] # Representação do polinômio gerador, neste caso CRC32 IEEE 802-3
+
+class SignalWindow(Gtk.Window):
+    def __init__(self, parent, encoding_type, modulation_type, bit_list):
+        super().__init__(title='Sinal', transient_for=parent)
+        
+        self.set_default_size(1000, 500)
+
+        self.encoding_type = encoding_type
+        self.modulation_type = modulation_type
+        signal_y = self.modulate_signal(bit_list)
+        self.create_signal_curve(bit_list, signal_y)
+
+    def modulate_signal (self, bit_list_in: list):
+        amp = 1.0
+        freq = 1.0
+        samplen = 100
+        signal_y = []
+        bit_list = list(bit_list_in)
+
+        match self.encoding_type:
+
+            case 0: # Sem código
+                match self.modulation_type:
+                    case 0: # Amplitude
+                        signal_y = amplitude_sk(amp, freq, bit_list, samplen)
+                    case 1: # Frequência
+                        signal_y = frequency_sk(amp, freq, freq*2, bit_list, samplen)
+                    case 2: # 8QAM
+                        signal_y = eight_qam(amp, freq, bit_list, samplen)
+                    case _:
+                        print("Invalid modulation type (" + str(self.modulation_type) + ") for encoding type: " + str(self.encoding_type))
+                        signal_y = bit_list
+            case 1: # NRZ Polar
+                match self.modulation_type:
+                    case 0: signal_y = ask_nrz(amp, freq, bit_list, samplen)
+                    case 1: signal_y = fsk_nrz(amp, freq, freq*2, bit_list, samplen)
+                    case 2: signal_y = eight_qam_nrz(amp, freq, bit_list, samplen)
+                    case _:
+                        print("Invalid modulation type (" + str(self.modulation_type) + ") for encoding type: " + str(self.encoding_type))
+                        signal_y = bit_list
+            case 2: # Manchester
+                match self.modulation_type:
+                    case 0: signal_y = ask_manchester(amp, freq, bit_list, samplen)
+                    case 1: signal_y = fsk_manchester(amp, freq, freq*2, bit_list, samplen)
+                    case 2: signal_y = eight_qam_manchester(amp, freq, bit_list, samplen)
+                    case _:
+                        print("Invalid modulation type (" + str(self.modulation_type) + ") for encoding type: " + str(self.encoding_type))
+                        signal_y = bit_list
+            case 3: # Bipolar
+                match self.modulation_type:
+                    case 0: signal_y = ask_bipolar(amp, freq, bit_list, samplen)
+                    case 1: signal_y = fsk_bipolar(amp, freq, freq*4, bit_list, samplen)
+                    case 2: signal_y = eight_qam_bipolar_amplitude(amp, freq, bit_list, samplen)
+                    case _:
+                        print("Invalid modulation type (" + str(self.modulation_type) + ") for encoding type: " + str(self.encoding_type))
+                        signal_y = bit_list
+
+        return signal_y
+    
+    def create_signal_curve (self, bit_list, signal_y: list):
+        
+        # Para debug
+        index_list = [i for i in range(len(bit_list))]
+        print([(i,j) for i, j in zip(index_list, bit_list)])
+        length_x = len(bit_list)
+        signal_x = np.linspace(0, length_x, len(signal_y))
+        fig = Figure(figsize=(5, 4), dpi=100)
+        ax = fig.add_subplot()
+        # Código tirado de https://stackoverflow.com/a/10378357
+        # Impede que a curva fique conectada quando houver descontinuidade na função
+        pos = np.where(np.abs(np.diff(signal_y)) >= 0.5)[0]+1
+
+        signal_x = np.insert(signal_x, pos, np.nan)
+        signal_y = np.insert(signal_y, pos, np.nan)
+
+        ax.plot(signal_x, signal_y)
+        ax.xaxis.set_ticks(np.arange(0, len(bit_list), 1))
+        # Adiciona linhas verticais a cada intervalo igual a 1
+        for i in range(len(bit_list)):
+            ax.vlines(x=i, ymin=-1, ymax=1, colors='gray', ls=':', lw=1)
+
+        ax.axis('tight')
+
+        sw = Gtk.ScrolledWindow(margin_top=10, margin_bottom=10,
+                                margin_start=10, margin_end=10)
+        self.set_child(sw)
+
+        canvas = FigureCanvas(fig)  # a Gtk.DrawingArea
+        canvas.set_size_request(100*len(bit_list), 100)
+        sw.set_child(canvas)
+        return
 
 
 class GUIClient(Gtk.ApplicationWindow):
@@ -91,8 +188,7 @@ class GUIClient(Gtk.ApplicationWindow):
 
         encoded_bit_stream = self.encode_stream(bit_string)
 
-        signal_representation = self.modulate_stream(encoded_bit_stream)
-        self.display_modulated_signal(signal_representation)
+        self.display_modulated_signal(encoded_bit_stream)
 
         # Convertendo -1 para 255
         encoded_bit_stream = makeByteArrayFriendly(encoded_bit_stream)
@@ -110,13 +206,6 @@ class GUIClient(Gtk.ApplicationWindow):
             print('Got', repr(data))
         tcp_client.close()
 
-        # Agora desabilitar botão e caixa de texto para impedir mais entrada
-        # button.set_label("Enviado")
-        # button.set_sensitive(False)
-        # self.textview.set_sensitive(False)
-        # self.entry.set_editable(False)
-
-
     def create_textview(self):
         scrolledwindow = Gtk.ScrolledWindow()
         scrolledwindow.props.hexpand = True
@@ -130,19 +219,6 @@ class GUIClient(Gtk.ApplicationWindow):
         self.textview.props.cursor_visible = False
 
         scrolledwindow.set_child(self.textview)
-
-        self.tag_bold = self.textbuffer.create_tag(
-            'bold', weight=Pango.Weight.BOLD
-        )
-        self.tag_italic = self.textbuffer.create_tag(
-            'italic', style=Pango.Style.ITALIC
-        )
-        self.tag_underline = self.textbuffer.create_tag(
-            'underline', underline=Pango.Underline.SINGLE
-        )
-        self.tag_found = self.textbuffer.create_tag(
-            'found', background='yellow'
-        )
 
     def create_buttons(self):
         grid = Gtk.Grid()
@@ -357,7 +433,8 @@ class GUIClient(Gtk.ApplicationWindow):
     def display_modulated_signal (self, bit_string: list):
         """Faz desenho da curva do sinal e apresenta na tela. """
         # todo
-        pass
+        self.signalwin = SignalWindow(self, self.encoding_type, self.modulation_type, bit_string)
+        self.signalwin.present()
 
 
 def on_activate(app):
