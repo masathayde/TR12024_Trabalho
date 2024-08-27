@@ -297,7 +297,10 @@ class GUIServer(Gtk.ApplicationWindow):
         else:
             msg += "Nenhum erro detectado."
             msg += "\n"
-            msg += bin_msg.decode('utf8') + "\n"
+            try:
+                msg += bin_msg.decode('utf8') + "\n"
+            except UnicodeDecodeError:
+                msg += "Não foi possível decodificar mensagem. A mensagem não pode ser exibida.\n"
         
         return msg
 
@@ -308,6 +311,7 @@ class GUIServer(Gtk.ApplicationWindow):
         while len(bit_string) > 0:
             frame, bit_string = self.separate_frame(bit_string)
             if frame == []: # Não conseguimos criar uma frame por erro na sequência de bits
+                msgs += "Não foi possível encontrar um quadro.\n"
                 break
             msgs += self.get_msg_from_frame(frame)
         return msgs
